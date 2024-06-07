@@ -32,6 +32,10 @@ from smartsim.entity._new_ensemble import Ensemble
 pytestmark = pytest.mark.group_a
 
 _2x2_PARAMS = {"SPAM": ["a", "b"], "EGGS": ["c", "d"]}
+_2x2_EXE_ARG = {"EXE": [["a"],
+                        ["b", "c"]],
+                "ARGS": [["d"],
+                        ["e", "f"]]}
 _2_PERM_STRAT = lambda p, n: [{"SPAM": "a", "EGGS": "b"}, {"SPAM": "c", "EGGS": "d"}]
 
 
@@ -80,7 +84,6 @@ def test_expected_number_of_apps_created(
     ).as_jobs(mock_launcher_settings)
     assert len(jobs) == expected_num_jobs
 
-
 def test_ensemble_without_any_members_rasies_when_cast_to_jobs(mock_launcher_settings):
     with pytest.raises(ValueError):
         Ensemble(
@@ -124,3 +127,42 @@ def test_replicated_applications_have_eq_deep_copies_of_parameters(params):
         for app_2 in apps
         if app_1 is not app_2
     )
+
+def test_all_perm(mock_launcher_settings):
+    jobs = Ensemble(
+        "test_ensemble",
+        "echo",
+        ("hello", "world"),
+        parameters=_2x2_PARAMS,
+        exe_arg_parameters=_2x2_EXE_ARG,
+        permutation_strategy="all_perm",
+        max_permutations=1,
+        replicas=1,
+    ).as_jobs(mock_launcher_settings)
+    assert len(jobs) == 16
+
+def test_step(mock_launcher_settings):
+    jobs = Ensemble(
+        "test_ensemble",
+        "echo",
+        ("hello", "world"),
+        parameters=_2x2_PARAMS,
+        exe_arg_parameters=_2x2_EXE_ARG,
+        permutation_strategy="step",
+        max_permutations=1,
+        replicas=1,
+    ).as_jobs(mock_launcher_settings)
+    assert len(jobs) == 2
+
+def test_random(mock_launcher_settings):
+    jobs = Ensemble(
+        "test_ensemble",
+        "echo",
+        ("hello", "world"),
+        parameters=_2x2_PARAMS,
+        exe_arg_parameters=_2x2_EXE_ARG,
+        permutation_strategy="random",
+        max_permutations=1,
+        replicas=1,
+    ).as_jobs(mock_launcher_settings)
+    assert len(jobs) == 1

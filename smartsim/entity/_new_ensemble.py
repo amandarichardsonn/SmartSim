@@ -30,6 +30,7 @@ import copy
 import itertools
 import os
 import typing as t
+import itertools
 
 # TODO: We are using the mocks defined `mock` module. We should use the correct
 #       module when these types are actually defined when PRs #587 and #603 are
@@ -52,6 +53,7 @@ class Ensemble(entity.CompoundEntity):
         exe_args: t.Sequence[str] | None = None,
         files: EntityFiles | None = None,
         parameters: t.Mapping[str, t.Sequence[str]] | None = None,
+        exe_arg_parameters: t.Mapping[str, t.Sequence[t.Sequence[str]]] | None = None,
         permutation_strategy: str | strategies.TPermutationStrategy = "all_perm",
         max_permutations: int = 0,
         replicas: int = 1,
@@ -62,16 +64,24 @@ class Ensemble(entity.CompoundEntity):
         self.files = copy.deepcopy(files) if files else EntityFiles()
         self.parameters = dict(parameters) if parameters else {}
         self.permutation_strategy = permutation_strategy
+        self.exe_arg_parameters = copy.deepcopy(exe_arg_parameters) if exe_arg_parameters else {}
         self.max_permutations = max_permutations
         self.replicas = replicas
 
     def _create_applications(self) -> tuple[Application, ...]:
-        permutation_strategy = strategies.resolve(self.permutation_strategy)
-        permutations = permutation_strategy(self.parameters, self.max_permutations)
-        permutations = permutations if permutations else [{}]
-        permutations_ = itertools.chain.from_iterable(
-            itertools.repeat(permutation, self.replicas) for permutation in permutations
+        test = copy.deepcopy(self.permutation_strategy)
+        perm = strategies.resolve(self.permutation_strategy)
+        file_param_permutations = perm(self.parameters, self.max_permutations)
+        file_param_permutations = file_param_permutations if file_param_permutations else [{}]
+        # defined the exe_arg permutations
+        exe_arg_permutations = perm(self.exe_arg_parameters, self.max_permutations)
+        exe_arg_permutations = exe_arg_permutations if exe_arg_permutations else [{}]
+        combination_strategy = strategies.resolve_combination(test)
+        compute_combination = combination_strategy(file_param_permutations,exe_arg_permutations)
+        combinations_ = itertools.chain.from_iterable(
+            itertools.repeat(permutation, self.replicas) for permutation in compute_combination
         )
+        
         return tuple(
             Application(
                 name=f"{self.name}-{i}",
@@ -81,9 +91,10 @@ class Ensemble(entity.CompoundEntity):
                 # FIXME: remove this constructor arg! It should not exist!!
                 exe_args=self.exe_args,
                 files=self.files,
-                params=permutation,
+                params=file_p,
+                params_as_args=exe_a,
             )
-            for i, permutation in enumerate(permutations_)
+            for i, (exe_a, file_p) in enumerate(combinations_)
         )
 
     def as_jobs(self, settings: _mock.LaunchSettings) -> tuple[_mock.Job, ...]:
