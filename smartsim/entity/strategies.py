@@ -38,25 +38,7 @@ from smartsim.error import errors
 TPermutationStrategy = t.Callable[
     [t.Mapping[str, t.Sequence[str]], int], list[dict[str, str]]
 ]
-
-# Defined a type alias, A callable (function) that takes in:
-#          1. exe_arg_param permutations: list[dict[str, str]]
-#          2. file_param permutations: list[dict[str, str]]
-# and it will return:
-#          - type: list[tuple[dict[str, str], dict[str, list[str]]]]
-#          - example: [({'EXE': ['a'], 'ARGS': ['e', 'f']}, {'SPAM': 'a', 'EGGS': 'd'})]
-TCombinationStrategy = t.Callable[
-    [list[dict[str, str]], list[dict[str, str]]], list[tuple[dict[str, str], dict[str, list[str]]]]
-]
 _REGISTERED_STRATEGIES: t.Final[dict[str, TPermutationStrategy]] = {}
-
-# Defined a dictionary variable that will store:
-#          {  
-#             'all_perm': <function create_all_combinations>,
-#             'step': <function step_combinations>, 
-#             'random': <function random_combinations>
-#          }
-_REGISTERED_COMBINATION_STRATEGIES: t.Final[dict[str, TCombinationStrategy]] = {}
 
 def _register_permutations(name: str) -> t.Callable[
     [TPermutationStrategy],
@@ -72,22 +54,6 @@ def _register_permutations(name: str) -> t.Callable[
 
     return _impl
 
-# Defining a decorator function to register combining sequence functions
-# Called when @_register_combinations is reached
-def _register_combinations(name: str) -> t.Callable[
-    [TCombinationStrategy],
-    TCombinationStrategy,
-]:
-    def _impl(fn: TPermutationStrategy) -> TPermutationStrategy:
-        if name in _REGISTERED_COMBINATION_STRATEGIES:
-            msg = f"A combination strategy with the name '{name}' has already been registered"
-            raise ValueError(msg)
-        _REGISTERED_COMBINATION_STRATEGIES[name] = fn
-        return fn
-
-    return _impl
-
-
 def resolve(strategy: str | TPermutationStrategy) -> TPermutationStrategy:
     if callable(strategy):
         return _make_safe_custom_strategy(strategy)
@@ -98,9 +64,6 @@ def resolve(strategy: str | TPermutationStrategy) -> TPermutationStrategy:
             f"Failed to find an ensembling strategy by the name of '{strategy}'."
             f"All known strategies are:\n{', '.join(_REGISTERED_STRATEGIES)}"
         ) from None
-
-def resolve_combination(strategy: str | TCombinationStrategy) -> TCombinationStrategy:
-    return _REGISTERED_COMBINATION_STRATEGIES[strategy]
 
 def _make_safe_custom_strategy(fn: TPermutationStrategy) -> TPermutationStrategy:
     @functools.wraps(fn)
@@ -119,11 +82,10 @@ def _make_safe_custom_strategy(fn: TPermutationStrategy) -> TPermutationStrategy
 
     return _impl
 
-
 # create permutations of all parameters
 # single application if parameters only have one value
 @_register_permutations("all_perm")
-def create_all_permutations(
+def create_all_permutations( # Instead return the class
     params: t.Mapping[str, t.Sequence[str]],
     _n_permutations: int = 0,
     # ^^^^^^^^^^^^^
@@ -131,7 +93,7 @@ def create_all_permutations(
     #       as the original impl for now. Will change if requested!
 ) -> list[dict[str, str]]:
     permutations = itertools.product(*params.values())
-    return [dict(zip(params, permutation)) for permutation in permutations]
+    return [dict(zip(params, permutation)) for permutation in permutations][:_n_permutations]
 
 
 @_register_permutations("step")
@@ -139,14 +101,14 @@ def step_values(
     params: t.Mapping[str, t.Sequence[str]], _n_permutations: int = 0
 ) -> list[dict[str, str]]:
     steps = zip(*params.values())
-    return [dict(zip(params, step)) for step in steps]
+    return [dict(zip(params, step)) for step in steps][:_n_permutations]
 
 
 @_register_permutations("random")
 def random_permutations(
     params: t.Mapping[str, t.Sequence[str]], n_permutations: int = 0
 ) -> list[dict[str, str]]:
-    permutations = create_all_permutations(params, 0)
+    permutations = create_all_permutations(params, n_permutations)
 
     # sample from available permutations if n_permutations is specified
     if 0 < n_permutations < len(permutations):
@@ -154,41 +116,104 @@ def random_permutations(
 
     return permutations
 
+# A type alias -> a Callable (function) that takes in:
+#          1. exe_arg_parameters PERMUTATIONS of type dict[str, list[str]]]
+#          2. parameters PERMUTATIONS of type list[dict[str, str]]
+# and it will return:
+#          - type: list[tuple[dict[str, str], dict[str, list[str]]]]
+#          - example: [({'EXE': ['a'], 'ARGS': ['e', 'f']}, {'SPAM': 'a', 'EGGS': 'd'})]
+TCombinationStrategy = t.Callable[
+    [list[dict[str, str]], list[dict[str, str]]], list[tuple[dict[str, str], dict[str, list[str]]]]
+]
+
+# Defined a dictionary variable that will store:
+#          {  
+#             'all_perm': <function create_all_combinations>,
+#             'step': <function step_combinations>, 
+#             'random': <function random_combinations>
+#          }
+_REGISTERED_COMBINATION_STRATEGIES: t.Final[dict[str, TCombinationStrategy]] = {}
+
+# A decorator function to register combination of sequence functions
+# Called when @_register_combinations decorators are reached
+def _register_combinations(name: str) -> t.Callable[
+    [TCombinationStrategy],
+    TCombinationStrategy,
+]:
+    def _impl(fn: TPermutationStrategy) -> TPermutationStrategy:
+        if name in _REGISTERED_COMBINATION_STRATEGIES:
+            msg = f"A combination strategy with the name '{name}' has already been registered"
+            raise ValueError(msg)
+        _REGISTERED_COMBINATION_STRATEGIES[name] = fn
+        return fn
+
+    return _impl
+
+def resolve_combination(strategy: str | TCombinationStrategy) -> TCombinationStrategy:
+    return _REGISTERED_COMBINATION_STRATEGIES[strategy]
+
+# Feedback
+# Define some classes that make it easier to accomplish in a single method
+# Currenlty passing around lots of types, might be helpful to establish order
+# Ex: define param set = param with all possible values
+
+# Create something similar to a typedef for return types
+# No user facing classes
+# Combine into one method
+
+
 @_register_combinations("all_perm")
 def create_all_combinations(
     file_param_permutations,
     exe_arg_permutations,
-    _n_permutations: int = 0,
-    # ^^^^^^^^^^^^^
-    # TODO: Really don't like that this attr is ignored, but going to leave it
-    #       as the original impl for now. Will change if requested!
+    _n_permutations,
 ) -> list[tuple[dict[str, str], dict[str, list[str]]]]:
+    if exe_arg_permutations == [{}] and file_param_permutations == [{}]:
+        return [({}, {})]
     # Find all possible combinations of file_params and exe_args
-        combinations = list(itertools.product(exe_arg_permutations, file_param_permutations))
-        return combinations
+    combinations = itertools.product(exe_arg_permutations, file_param_permutations)
+    # pg = (next(combinations) for _ in range(_n_permutations))
+    result = []
+    for _ in range(_n_permutations):
+        try:
+            val = next(combinations)
+            print(f"yurp: {val}")
+            result.append(val)
+        except StopIteration:
+            break
+    print(f"length: {len(result)}")
+    return result
 
 @_register_combinations("step")
 def step_combinations(
     file_param_permutations,
     exe_arg_permutations,
-    _n_permutations: int = 0
+    _n_permutations,
 ) -> list[tuple[dict[str, str], dict[str, list[str]]]]:
-    # Unzip the values from the input dictionaries
-    # Initialize an empty list to store the result
     combinations = []
-    # Unzip the values from the input dictionaries
-    for (f, b) in zip(file_param_permutations, exe_arg_permutations):    
-        # Append the tuple to the result list
-        combinations.append((f, b))
+    if exe_arg_permutations == [{}]:
+        # Unzip the values from the input dictionaries
+        for f in zip(file_param_permutations):
+            # Append the tuple to the result list
+            combinations.append((f, {}))
+            if len(combinations) >= _n_permutations:
+                break
+    else:
+        # Unzip the values from the input dictionaries
+        for (f, b) in zip(file_param_permutations, exe_arg_permutations):
+            # Append the tuple to the result list
+            combinations.append((f, b))
+            if len(combinations) >= _n_permutations:
+                break
     return combinations
 
 @_register_combinations("random")
 def random_combinations(
     file_param_permutations,
     exe_arg_permutations,
-    _n_permutations: int = 0
+    _n_permutations,
 ) -> list[tuple[dict[str, str], dict[str, list[str]]]]:
-    combinations = create_all_combinations(file_param_permutations, exe_arg_permutations, 0)
+    combinations = create_all_combinations(file_param_permutations, exe_arg_permutations, _n_permutations)
 
     # sample from available permutations if n_permutations is specified
     if 0 < _n_permutations < len(combinations):

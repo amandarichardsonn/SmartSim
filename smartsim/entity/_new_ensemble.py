@@ -52,10 +52,11 @@ class Ensemble(entity.CompoundEntity):
         exe: str | os.PathLike[str],
         exe_args: t.Sequence[str] | None = None,
         files: EntityFiles | None = None,
+        # rename var: file_parameters
         parameters: t.Mapping[str, t.Sequence[str]] | None = None,
         exe_arg_parameters: t.Mapping[str, t.Sequence[t.Sequence[str]]] | None = None,
         permutation_strategy: str | strategies.TPermutationStrategy = "all_perm",
-        max_permutations: int = 0,
+        max_permutations: int = 1, # TODO number of max params default, maybe None, if statements
         replicas: int = 1,
     ) -> None:
         self.name = name
@@ -68,20 +69,29 @@ class Ensemble(entity.CompoundEntity):
         self.max_permutations = max_permutations
         self.replicas = replicas
 
+    # should be one step -> permutation_strategy should take in self.exe_arg_parameters, self.files, self.max_permutations
+    # what should come out is the value of combinations_
+    
+    # have a
     def _create_applications(self) -> tuple[Application, ...]:
-        test = copy.deepcopy(self.permutation_strategy)
-        perm = strategies.resolve(self.permutation_strategy)
-        file_param_permutations = perm(self.parameters, self.max_permutations)
-        file_param_permutations = file_param_permutations if file_param_permutations else [{}]
-        # defined the exe_arg permutations
-        exe_arg_permutations = perm(self.exe_arg_parameters, self.max_permutations)
-        exe_arg_permutations = exe_arg_permutations if exe_arg_permutations else [{}]
-        combination_strategy = strategies.resolve_combination(test)
-        compute_combination = combination_strategy(file_param_permutations,exe_arg_permutations)
+        # Grab callable function to permutate parameters and exe_arg_parameters
+        permutation_strategy = strategies.resolve(self.permutation_strategy)
+        # Permutate parameters
+        file_param_permutations = permutation_strategy(self.parameters, self.exe_arg_params, self.max_permutations)
+        # below will be wrapped in permutation_strategy
+        # file_param_permutations = file_param_permutations if file_param_permutations else [{}]
+        # print(f"here: {len(file_param_permutations)}")
+        # # Permutate exe_arg_parameters
+        # exe_arg_permutations = permutation_strategy(self.exe_arg_parameters, self.max_permutations)
+        # exe_arg_permutations = exe_arg_permutations if exe_arg_permutations else [{}]
+        # print(f"yurr: {len(exe_arg_permutations)}")
+        # # Grab the callable function to combine parameters and exe_arg_parameters permutations
+        # combination_strategy = strategies.resolve_combination(self.permutation_strategy) # NOPE REMOVE
+        # hold = permutation_strategy(dict[{"FILES"}:file_param_permutations, {"EXE"}:exe_arg_permutations],self.max_permutations)
+        # Apply replicas
         combinations_ = itertools.chain.from_iterable(
             itertools.repeat(permutation, self.replicas) for permutation in compute_combination
         )
-        
         return tuple(
             Application(
                 name=f"{self.name}-{i}",
@@ -91,6 +101,7 @@ class Ensemble(entity.CompoundEntity):
                 # FIXME: remove this constructor arg! It should not exist!!
                 exe_args=self.exe_args,
                 files=self.files,
+                # rename
                 params=file_p,
                 params_as_args=exe_a,
             )

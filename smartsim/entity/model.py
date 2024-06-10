@@ -56,9 +56,10 @@ logger = get_logger(__name__)
 class Application(SmartSimEntity):
     def __init__(
         self,
-        name: str,
+        name: str, # do we have exe_arg_params on application
         exe: str,
         run_settings: "RunSettings",
+        # rename to file_params
         params: t.Optional[t.Dict[str, str]] = None,
         exe_args: t.Optional[t.List[str]] = None,
         path: t.Optional[str] = getcwd(),
