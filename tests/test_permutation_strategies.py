@@ -37,14 +37,14 @@ def test_strategy_registration(monkeypatch):
     monkeypatch.setattr(strategies, "_REGISTERED_STRATEGIES", {})
     assert not strategies._REGISTERED_STRATEGIES
 
-    new_strat = lambda params, nmax: []
+    new_strat = lambda params, exe_args, nmax: []
     strategies._register("new_strat")(new_strat)
     assert strategies._REGISTERED_STRATEGIES == {"new_strat": new_strat}
 
 
 def test_strategies_cannot_be_overwritten(monkeypatch):
     monkeypatch.setattr(
-        strategies, "_REGISTERED_STRATEGIES", {"some-strategy": lambda params, nmax: []}
+        strategies, "_REGISTERED_STRATEGIES", {"some-strategy": lambda params, exe_args, nmax: []}
     )
     with pytest.raises(ValueError):
         strategies._register("some-strategy")(lambda params, nmax: [])
