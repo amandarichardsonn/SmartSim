@@ -29,7 +29,7 @@ import typing as t
 
 import pytest
 
-from smartsim.entity import _mock
+from smartsim.settings import LaunchSettings
 from smartsim.entity._new_ensemble import Ensemble
 from smartsim.entity.param_data_class import ParamSet
 from smartsim.error import errors
@@ -37,21 +37,13 @@ from smartsim.error import errors
 pytestmark = pytest.mark.group_a
 
 _2x2_PARAMS = {"SPAM": ["a", "b"], "EGGS": ["c", "d"]}
-# real func and also replace with the actual types
-_2_PERM_STRAT = lambda p, n, e: [
-    {"SPAM": "a", "EGGS": "b"},
-    {"SPAM": "c", "EGGS": "d"},
-    {"SPAM": "a", "EGGS": "b"},
-]
 _2x2_EXE_ARG = {"EXE": [["a"], ["b", "c"]], "ARGS": [["d"], ["e", "f"]]}
-
 
 def user_created_function(
     file_params: t.Mapping[str, t.Sequence[str]],
     exe_arg_params: t.Mapping[str, t.Sequence[t.Sequence[str]]],
     _n_permutations: int = 0,
 ) -> list[ParamSet]:
-    exe_arg_params = _2x2_EXE_ARG
     # Create dictionaries for each parameter permutation
     param_zip = [dict(zip(file_params, permutation)) for permutation in file_params][
         :_n_permutations
@@ -67,63 +59,19 @@ def user_created_function(
     return list(param_set)
 
 
-@pytest.fixture
-def mock_launcher_settings():
-    # TODO: Remove this mock with #587
-    #       https://github.com/CrayLabs/SmartSim/pull/587
-    return _mock.LaunchSettings()
-
-
-# fmt: off
-@pytest.mark.parametrize(
-    "                  params,      strategy,  max_perms, replicas, expected_num_jobs",  # Test Name                                       Misc
-    (pytest.param(       None,    "all_perm",         30,        1,                 1 , id="No Parameters or Replicas")                    ,
-     pytest.param(_2x2_PARAMS,    "all_perm",         30,        1,                 4 , id="All Permutations")                             ,
-     pytest.param(_2x2_PARAMS,        "step",         30,        1,                 2 , id="Stepped Params")                               ,
-     pytest.param(_2x2_PARAMS,      "random",         30,        1,                 4 , id="Random Permutations")                          ,
-     pytest.param(_2x2_PARAMS,    "all_perm",          1,        1,                 1 , id="All Permutations [Capped Max Permutations]")   ,
-     pytest.param(_2x2_PARAMS,        "step",          1,        1,                 1 , id="Stepped Params [Capped Max Permutations]")     ,
-     pytest.param(_2x2_PARAMS,      "random",          1,        1,                 1 , id="Random Permutations [Capped Max Permutations]"), #     ^^^^^^^^^^^^^^^^^
-     pytest.param(_2x2_PARAMS, user_created_function, 30,        1,                 4 , id="Custom_Permutation_Strategy")                  , # TODO: I would argue that we should make these cases pass
-     pytest.param(         {},    "all_perm",         30,        5,                 5 , id="Identical Replicas")                           ,
-     pytest.param(_2x2_PARAMS,    "all_perm",         30,        2,                 8 , id="Replicas of All Permutations")                 ,
-     pytest.param(_2x2_PARAMS,        "step",         30,        2,                 4 , id="Replicas of Stepped Params")                   ,
-     pytest.param(_2x2_PARAMS,      "random",          3,        2,                 6 , id="Replicas of Random Permutations")              ,
-))
-# fmt: on
-def test_expected_number_of_apps_created(
-    # Parameterized
-    params,
-    strategy,
-    max_perms,
-    replicas,
-    expected_num_jobs,
-    # Other fixtures
-    mock_launcher_settings,
-):
-    jobs = Ensemble(
-        "test_ensemble",
-        "echo",
-        ("hello", "world"),
-        file_parameters=params,
-        permutation_strategy=strategy,
-        max_permutations=max_perms,
-        replicas=replicas,
-    ).as_jobs(mock_launcher_settings)
-    assert len(jobs) == expected_num_jobs
-
-
-def test_ensemble_without_any_members_raises_when_cast_to_jobs(mock_launcher_settings):
+def test_ensemble_without_any_members_raises_when_cast_to_jobs(wlmutils):
+    test_launcher = wlmutils.get_test_launcher()
     with pytest.raises(ValueError):
         Ensemble(
             "test_ensemble",
             "echo",
             ("hello", "world"),
             file_parameters=_2x2_PARAMS,
+            exe_arg_parameters=_2x2_EXE_ARG,
             permutation_strategy="random",
-            max_permutations=30,
+            max_permutations=1,
             replicas=0,
-        ).as_jobs(mock_launcher_settings)
+        ).as_jobs(LaunchSettings(test_launcher))
 
 
 def test_strategy_error_raised_if_a_strategy_that_dne_is_requested():
@@ -163,11 +111,15 @@ def test_replicated_applications_have_eq_deep_copies_of_parameters(params):
 # fmt: off
 @pytest.mark.parametrize(
     "                  params,      exe_arg_params,   strategy,  max_perms, replicas, expected_num_jobs",  # Test Name          
-    (pytest.param(_2x2_PARAMS,        _2x2_EXE_ARG, "all_perm",         30,        1,                16 , id="1"),
-     pytest.param(_2x2_PARAMS,                None, "all_perm",         30,        1,                4  , id="2"),
-     pytest.param(       None,                None, "all_perm",         30,        1,                1  , id="3"),
-     pytest.param(_2x2_PARAMS,        _2x2_EXE_ARG, "all_perm",          8,        1,                8  , id="3"),
-     pytest.param(_2x2_PARAMS,        _2x2_EXE_ARG, "all_perm",         30,        2,                32 , id="1"),
+    (pytest.param(_2x2_PARAMS,        _2x2_EXE_ARG, "all_perm",         30,        1,                16 , id="get_all_permutations"),
+     pytest.param(_2x2_PARAMS,                None, "all_perm",         30,        1,                4  , id="set_exe_arg_params_to_none"),
+     pytest.param(       None,        _2x2_EXE_ARG, "all_perm",         30,        1,                4  , id="set_file_params_to_none"),
+     pytest.param(       None,                None, "all_perm",         30,        1,                1  , id="set_both_params_to_none"),
+     pytest.param(_2x2_PARAMS,        _2x2_EXE_ARG, "all_perm",          8,        1,                8  , id="limit_max_permutations"),
+     pytest.param(_2x2_PARAMS,        _2x2_EXE_ARG, "all_perm",         30,        2,                32 , id="replicate_all_permutations"),
+     pytest.param(_2x2_PARAMS,                  {}, "all_perm",         30,        1,                 4 , id="set_exe_arg_params_to_empty_dict"),
+     pytest.param({},                 _2x2_EXE_ARG, "all_perm",         30,        1,                 4 , id="set_file_params_to_empty_dict"),
+     pytest.param({},                           {}, "all_perm",         30,        1,                 1 , id="set_both_params_to_empty_dict"),
 ))
 # fmt: on
 def test_all_perm_strategy(
@@ -179,8 +131,9 @@ def test_all_perm_strategy(
     replicas,
     expected_num_jobs,
     # Other fixtures
-    mock_launcher_settings,
+    wlmutils
 ):
+    test_launcher = wlmutils.get_test_launcher()
     jobs = Ensemble(
         "test_ensemble",
         "echo",
@@ -190,11 +143,12 @@ def test_all_perm_strategy(
         permutation_strategy=strategy,
         max_permutations=max_perms,
         replicas=replicas,
-    ).as_jobs(mock_launcher_settings)
+    ).as_jobs(LaunchSettings(test_launcher))
     assert len(jobs) == expected_num_jobs
 
 
-def test_all_perm_strategy_contents():
+def test_all_perm_strategy_contents(wlmutils):
+    test_launcher = wlmutils.get_test_launcher()
     jobs = Ensemble(
         "test_ensemble",
         "echo",
@@ -204,18 +158,36 @@ def test_all_perm_strategy_contents():
         permutation_strategy="all_perm",
         max_permutations=16,
         replicas=1,
-    ).as_jobs(mock_launcher_settings)
+    ).as_jobs(LaunchSettings(test_launcher))
     assert len(jobs) == 16
+
+def test_user_created_strategy(wlmutils):
+    test_launcher = wlmutils.get_test_launcher()
+    jobs = Ensemble(
+        "test_ensemble",
+        "echo",
+        ("hello", "world"),
+        file_parameters=_2x2_PARAMS,
+        exe_arg_parameters=_2x2_EXE_ARG,
+        permutation_strategy=user_created_function,
+        max_permutations=16,
+        replicas=1,
+    ).as_jobs(LaunchSettings(test_launcher))
+    assert len(jobs) == 4
 
 
 # fmt: off
 @pytest.mark.parametrize(
     "                  params,      exe_arg_params,   strategy,  max_perms, replicas, expected_num_jobs",  # Test Name          
-    (pytest.param(_2x2_PARAMS,        _2x2_EXE_ARG,     "step",         30,        1,                2  , id="Set_max_permutation_high"),
-     pytest.param(_2x2_PARAMS,                None,     "step",         30,        1,                2  , id="No file params or Replicas"),
-     pytest.param(       None,        _2x2_EXE_ARG,     "step",         30,        1,                2  , id="No_exe_arg_params_or_Replicas"),
-     pytest.param(_2x2_PARAMS,        _2x2_EXE_ARG,     "step",          1,        1,                1  , id="Set max permutation to lowest"),
-     pytest.param(_2x2_PARAMS,        _2x2_EXE_ARG,     "step",         30,        2,                4  , id="Set params as dict, set max permutations and replicas"),
+    (pytest.param(_2x2_PARAMS,        _2x2_EXE_ARG,     "step",         30,        1,                 2 , id="get_all_permutations"),
+     pytest.param(_2x2_PARAMS,                None,     "step",         30,        1,                 2 , id="set_exe_arg_params_to_none"),
+     pytest.param(       None,        _2x2_EXE_ARG,     "step",         30,        1,                 2 , id="set_file_params_to_none"),
+     pytest.param(       None,                None,     "step",         30,        1,                 1 , id="set_both_params_to_none"),
+     pytest.param(_2x2_PARAMS,        _2x2_EXE_ARG,     "step",          2,        1,                 2 , id="limit_max_permutations"),
+     pytest.param(_2x2_PARAMS,        _2x2_EXE_ARG,     "step",         30,        2,                 4 , id="replicate_all_permutations"),
+     pytest.param(_2x2_PARAMS,                  {},     "step",         30,        1,                 2 , id="set_exe_arg_params_to_empty_dict"),
+     pytest.param({},                 _2x2_EXE_ARG,     "step",         30,        1,                 2 , id="set_file_params_to_empty_dict"),
+     pytest.param({},                           {},     "step",         30,        1,                 1 , id="set_both_params_to_empty_dict"),
 ))
 # fmt: on
 def test_step_strategy(
@@ -227,8 +199,9 @@ def test_step_strategy(
     replicas,
     expected_num_jobs,
     # Other fixtures
-    mock_launcher_settings,
+    wlmutils,
 ):
+    test_launcher = wlmutils.get_test_launcher()
     jobs = Ensemble(
         "test_ensemble",
         "echo",
@@ -238,21 +211,22 @@ def test_step_strategy(
         permutation_strategy=strategy,
         max_permutations=max_perms,
         replicas=replicas,
-    ).as_jobs(mock_launcher_settings)
+    ).as_jobs(LaunchSettings(test_launcher))
     assert len(jobs) == expected_num_jobs
 
 
 # fmt: off
 @pytest.mark.parametrize(
     "                  params,      exe_arg_params,   strategy,  max_perms, replicas, expected_num_jobs",         
-    (pytest.param(_2x2_PARAMS,        _2x2_EXE_ARG,   "random",         30,        1,                16 , id="Set max permutation high"),  # Ask about this 
-     pytest.param(_2x2_PARAMS,                None,   "random",          4,        1,                4  , id="No exe arg params or Replicas"),
-     pytest.param(       None,        _2x2_EXE_ARG,   "random",          4,        1,                4  , id="No Parameters or Replicas"),
-     pytest.param(       None,                None,   "random",          1,        1,                1  , id="No Parameters, Exe_Arg_Param or Replicas"),
-     pytest.param(_2x2_PARAMS,        _2x2_EXE_ARG,   "random",          1,        1,                1  , id="Set max permutation to lowest"),
-     pytest.param(_2x2_PARAMS,        _2x2_EXE_ARG,   "random",          6,        2,                12 , id="Set max permutation, set replicas"),
-     pytest.param(         {},        _2x2_EXE_ARG,   "random",          6,        2,                 8 , id="Set params as dict, set max permutations and replicas"),
-     pytest.param(_2x2_PARAMS,        _2x2_EXE_ARG, user_created_function,      30,        1,                4 , id="Custom_Permutation_Strategy")
+    (pytest.param(_2x2_PARAMS,        _2x2_EXE_ARG,   "random",         30,        1,                16 , id="get_all_permutations"),
+     pytest.param(_2x2_PARAMS,                None,   "random",         30,        1,                 4 , id="set_exe_arg_params_to_none"),
+     pytest.param(       None,        _2x2_EXE_ARG,   "random",         30,        1,                 4 , id="set_file_params_to_none"),
+     pytest.param(       None,                None,   "random",         30,        1,                 1 , id="set_both_params_to_none"),
+     pytest.param(_2x2_PARAMS,        _2x2_EXE_ARG,   "random",          2,        1,                 2 , id="limit_max_permutations"),
+     pytest.param(_2x2_PARAMS,        _2x2_EXE_ARG,   "random",         30,        2,                32 , id="replicate_all_permutations"),
+     pytest.param(_2x2_PARAMS,                  {},   "random",         30,        1,                 4 , id="set_exe_arg_params_to_empty_dict"),
+     pytest.param({},                 _2x2_EXE_ARG,   "random",         30,        1,                 4 , id="set_file_params_to_empty_dict"),
+     pytest.param({},                           {},   "random",         30,        1,                 1 , id="set_both_params_to_empty_dict"),
 ))
 # fmt: on
 def test_random_strategy(
@@ -264,8 +238,9 @@ def test_random_strategy(
     replicas,
     expected_num_jobs,
     # Other fixtures
-    mock_launcher_settings,
+    wlmutils
 ):
+    test_launcher = wlmutils.get_test_launcher()
     jobs = Ensemble(
         "test_ensemble",
         "echo",
@@ -275,5 +250,5 @@ def test_random_strategy(
         permutation_strategy=strategy,
         max_permutations=max_perms,
         replicas=replicas,
-    ).as_jobs(mock_launcher_settings)
+    ).as_jobs(LaunchSettings(test_launcher))
     assert len(jobs) == expected_num_jobs
