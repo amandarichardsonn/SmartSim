@@ -37,7 +37,8 @@ from smartsim.error import errors
 
 from .param_data_class import ParamSet
 
-TPermutationStrategy = t.Callable[
+# Type alias for the shape of a permutation strategy callable
+PermutationStrategyType = t.Callable[
     [t.Mapping[str, t.Sequence[str]], t.Mapping[str, t.Sequence[t.Sequence[str]]], int],
     list[ParamSet],
 ]
@@ -136,14 +137,30 @@ def _make_sanitized_custom_strategy(
     return _impl
 
 
-# create permutations of all parameters
-# single application if parameters only have one value
 @_register("all_perm")
 def create_all_permutations(
     file_params: t.Mapping[str, t.Sequence[str]],
     exe_arg_params: t.Mapping[str, t.Sequence[t.Sequence[str]]],
     _n_permutations: int = 0,
 ) -> list[ParamSet]:
+    """Take a mapping parameters to possible values and return a sequence of
+    all possible permutations of those parameters.
+        For example calling:
+        .. highlight:: python
+        .. code-block:: python
+            create_all_permutations({"A": ["1", "2"],
+                                    "B": ["3", "4"]})
+        Would result in the following permutations (not necessarily in this order):
+        .. highlight:: python
+        .. code-block:: python
+            [{"A": "1", "B": "3"},
+            {"A": "1", "B": "4"},
+            {"A": "2", "B": "3"},
+            {"A": "2", "B": "4"}]
+    :param params: A mapping of parameter names to possible values
+    :param _n_permutations: <ignored>
+    :return: A sequence of mappings of all possible permutations
+    """
     # Generate all possible permutations of parameter values
     file_params_permutations = itertools.product(*file_params.values())
     # Create dictionaries for each parameter permutation
@@ -171,27 +188,6 @@ def step_values(
     exe_args: t.Mapping[str, t.Sequence[t.Sequence[str]]],
     _n_permutations: int = 0,
 ) -> list[ParamSet]:
-    # Zip the values of the 'params' dictionary
-    param_zip = zip(*params.values())
-    # Create a list of dictionaries, where each dictionary represents a combination of parameter values
-    # Limit the list to '_n_permutations' elements
-    param_zip = [dict(zip(params, step)) for step in param_zip][:_n_permutations]
-    # Zip the values of the 'exe_args' dictionary
-    exe_arg_zip = zip(*exe_args.values())
-    # Create a list of dictionaries, where each dictionary represents a combination of executable argument values
-    # Limit the list to '_n_permutations' elements
-    exe_arg_zip = [dict(zip(exe_args, step)) for step in exe_arg_zip][:_n_permutations]
-    # Combine the parameter sets from 'param_zip' and 'exe_arg_zip' using itertools.zip_longest
-    param_set = (
-        ParamSet(file_param, exe_arg)
-        for (file_param, exe_arg) in itertools.zip_longest(param_zip, exe_arg_zip)
-    )
-    # Limit the generator to '_n_permutations' elements
-    slice = itertools.islice(param_set, _n_permutations)
-    # Convert the limited generator to a list and return it
-    return list(slice)
-    params: t.Mapping[str, t.Sequence[str]], _n_permutations: int = 0
-) -> list[dict[str, str]]:
     """Take a mapping parameters to possible values and return a sequence of
     stepped values until a possible values sequence runs out of possible
     values.
@@ -216,29 +212,44 @@ def step_values(
     :param _n_permutations: <ignored>
     :return: A sequence of mappings of stepped values
     """
-    steps = zip(*params.values())
-    return [dict(zip(params, step)) for step in steps]
+    # Zip the values of the 'params' dictionary
+    param_zip = zip(*params.values())
+    # Create a list of dictionaries, where each dictionary represents a combination of parameter values
+    # Limit the list to '_n_permutations' elements
+    param_zip = [dict(zip(params, step)) for step in param_zip][:_n_permutations]
+    # Zip the values of the 'exe_args' dictionary
+    exe_arg_zip = zip(*exe_args.values())
+    # Create a list of dictionaries, where each dictionary represents a combination of executable argument values
+    # Limit the list to '_n_permutations' elements
+    exe_arg_zip = [dict(zip(exe_args, step)) for step in exe_arg_zip][:_n_permutations]
+    # Combine the parameter sets from 'param_zip' and 'exe_arg_zip' using itertools.zip_longest
+    param_set = (
+        ParamSet(file_param, exe_arg)
+        for (file_param, exe_arg) in itertools.zip_longest(param_zip, exe_arg_zip)
+    )
+    # Limit the generator to '_n_permutations' elements
+    slice = itertools.islice(param_set, _n_permutations)
+    # Convert the limited generator to a list and return it
+    return list(slice)
 
 
 @_register("random")
 def random_permutations(
     params: t.Mapping[str, t.Sequence[str]],
     exe_args: t.Mapping[str, t.Sequence[t.Sequence[str]]],
-    _n_permutations: int = 0,
+    n_permutations: int = 0
 ) -> list[ParamSet]:
-    # Generate all possible permutations of parameters and executable arguments
     """Take a mapping parameters to possible values and return a sequence of
     length `n_permutations`  sampled randomly from all possible permutations
-
     :param params: A mapping of parameter names to possible values
     :param n_permutations: The maximum number of permutations to sample from
         the sequence of all permutations
     :return: A sequence of mappings of sampled permutations
     """
-    permutations = create_all_permutations(params, exe_args, _n_permutations)
-    # If '_n_permutations' is specified and within a valid range, sample from the
-    # available permutations
-    if 0 < _n_permutations < len(permutations):
-        permutations = random.sample(permutations, _n_permutations)
-    # Return the list of permutations
+    permutations = create_all_permutations(params, exe_args, n_permutations)
+
+    # sample from available permutations if n_permutations is specified
+    if 0 < n_permutations < len(permutations):
+        permutations = random.sample(permutations, n_permutations)
+
     return permutations
