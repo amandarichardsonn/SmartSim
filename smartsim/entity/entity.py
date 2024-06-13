@@ -29,10 +29,6 @@ from __future__ import annotations
 import abc
 import typing as t
 
-if t.TYPE_CHECKING:
-    import smartsim.settings.base
-    from smartsim.entity import _mock
-
 
 class TelemetryConfiguration:
     """A base class for configuraing telemetry production behavior on
