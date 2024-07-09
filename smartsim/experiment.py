@@ -175,6 +175,38 @@ class Experiment:
         self.fs_identifiers: t.Set[str] = set()
         self._telemetry_cfg = ExperimentTelemetryConfiguration()
 
+    def start_jobs(self, *jobs: Job) -> tuple[LaunchedJobID, ...]:
+        """WIP: replacemnt method to launch jobs using the new API"""
+
+        if not jobs:
+            raise TypeError(
+                f"{type(self).__name__}.start_jobs() missing at least 1 required "
+                "positional argument"
+            )
+
+        def _start(job: Job) -> LaunchedJobID:
+            builder = job.launch_settings.launch_args
+            launcher_type = self._dispatcher.get_launcher_for(builder)
+            launcher = first(
+                lambda launcher: type(launcher) is launcher_type,
+                self._active_launchers,
+            )
+            if launcher is None:
+                launcher = launcher_type.create(self)
+                self._active_launchers.add(launcher)
+            # TODO write comments
+            job_execution_path = self._generate(job)
+            # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+            # FIXME: Opting out of type check here. Fix this later!!
+            # TODO: Very much dislike that we have to pass in attrs off of `job`
+            #       into `builder`, which is itself an attr of an attr of `job`.
+            #       Why is `Job` not generic based on launch arg builder?
+            # ---------------------------------------------------------------------
+            finalized = builder.finalize(job.entity, job.launch_settings.env_vars)
+            # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+            return launcher.start(finalized)
+
+        return tuple(map(_start, jobs))
     def _set_dragon_server_path(self) -> None:
         """Set path for dragon server through environment varialbes"""
         if not "SMARTSIM_DRAGON_SERVER_PATH" in environ:
@@ -290,12 +322,9 @@ class Experiment:
             raise
 
     @_contextualize
-    def generate(
+    def _generate(
         self,
-        *args: t.Union[SmartSimEntity, EntitySequence[SmartSimEntity]],
-        tag: t.Optional[str] = None,
-        overwrite: bool = False,
-        verbose: bool = False,
+        job: Job,
     ) -> None:
         """Generate the file structure for an ``Experiment``
 
@@ -315,10 +344,8 @@ class Experiment:
         :param verbose: log parameter settings to std out
         """
         try:
-            generator = Generator(self.exp_path, overwrite=overwrite, verbose=verbose)
-            if tag:
-                generator.set_tag(tag)
-            generator.generate_experiment(*args)
+            generator = Generator(self.exp_path, job)
+            generator.generate_experiment()
         except SmartSimError as e:
             logger.error(e)
             raise
