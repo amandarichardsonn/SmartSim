@@ -141,6 +141,7 @@ class Generator:
 
         :returns: path to file with parameter settings
         """
+        return join(self.run_path, "smartsim_params.txt")
         return join(self.path, "smartsim_params.txt")
 
     def generate_experiment(self) -> None:
@@ -175,19 +176,9 @@ class Generator:
         with open(self.log_file, mode="w", encoding="utf-8") as log_file:
             dt_string = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
             log_file.write(f"Generation start date and time: {dt_string}\n")
-
-    def _gen_job_dir(self) -> None:
-        """Generate directories for Entity instances
-
-        :param entities: list of Application instances
-        :param entity_list: Ensemble instance
-        :raises EntityExistsError: if a directory already exists for an
-                                   entity by that name
-        """
-        job_destination = job.entity.path
-        pathlib.Path(job_destination).mkdir(exist_ok=True)
-        if isinstance(Application, type(job.entity)):
-            file_operation_list = self.build_operations(job.entity)
+        
+        if isinstance(Application, type(self.job.entity)):
+            file_operation_list = self.build_operations()
             self.execute_file_operations(file_operation_list)
 
     def execute_file_operations(
