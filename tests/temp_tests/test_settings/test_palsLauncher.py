@@ -67,3 +67,40 @@ def test_invalid_hostlist_format():
         palsLauncher.launch_args.set_hostlist([5])
     with pytest.raises(TypeError):
         palsLauncher.launch_args.set_hostlist(5)
+
+
+@pytest.mark.parametrize(
+    "args, expected",
+    (
+        pytest.param({}, ("mpiexec", "--", "echo", "hello", "world"), id="Empty Args"),
+        pytest.param(
+            {"n": "1"},
+            ("mpiexec", "--n", "1", "--", "echo", "hello", "world"),
+            id="Short Arg",
+        ),
+        pytest.param(
+            {"host": "myhost"},
+            ("mpiexec", "--host", "myhost", "--", "echo", "hello", "world"),
+            id="Long Arg",
+        ),
+        pytest.param(
+            {"v": None},
+            ("mpiexec", "--v", "--", "echo", "hello", "world"),
+            id="Short Arg (No Value)",
+        ),
+        pytest.param(
+            {"verbose": None},
+            ("mpiexec", "--verbose", "--", "echo", "hello", "world"),
+            id="Long Arg (No Value)",
+        ),
+        pytest.param(
+            {"n": "1", "host": "myhost"},
+            ("mpiexec", "--n", "1", "--host", "myhost", "--", "echo", "hello", "world"),
+            id="Short and Long Args",
+        ),
+    ),
+)
+def test_formatting_launch_args(echo_executable_like, args, expected, test_dir):
+    cmd, path = PalsMpiexecArgBuilder(args).finalize(echo_executable_like, {}, test_dir)
+    assert tuple(cmd) == expected
+    assert path == test_dir

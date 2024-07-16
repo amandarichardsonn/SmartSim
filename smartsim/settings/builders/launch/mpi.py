@@ -225,6 +225,10 @@ class MpiArgBuilder(_BaseMPIArgBuilder):
         """Get the string representation of the launcher"""
         return LauncherType.Mpirun.value
 
+    def finalize(
+        self, exe: ExecutableLike, env: t.Mapping[str, str | None], job_execution_path: str
+    ) -> t.Sequence[str]:
+        return ("mpirun", *self.format_launch_args(), "--", *exe.as_program_arguments()), job_execution_path
 
 class MpiexecArgBuilder(_BaseMPIArgBuilder):
     def __init__(
@@ -237,6 +241,15 @@ class MpiexecArgBuilder(_BaseMPIArgBuilder):
         """Get the string representation of the launcher"""
         return LauncherType.Mpiexec.value
 
+    def finalize(
+        self, exe: ExecutableLike, env: t.Mapping[str, str | None], job_execution_path: str
+    ) -> t.Sequence[str]:
+        return (
+            "mpiexec",
+            *self.format_launch_args(),
+            "--",
+            *exe.as_program_arguments(),
+        ), job_execution_path
 
 class OrteArgBuilder(_BaseMPIArgBuilder):
     def __init__(
@@ -248,3 +261,13 @@ class OrteArgBuilder(_BaseMPIArgBuilder):
     def launcher_str(self) -> str:
         """Get the string representation of the launcher"""
         return LauncherType.Orterun.value
+
+    def finalize(
+        self, exe: ExecutableLike, env: t.Mapping[str, str | None], job_execution_path: str
+    ) -> t.Sequence[str]:
+        return (
+            "orterun",
+            *self.format_launch_args(),
+            "--",
+            *exe.as_program_arguments(),
+        ), job_execution_path
