@@ -30,6 +30,7 @@ import os
 import os.path as osp
 import typing as t
 from os import environ, getcwd
+import datetime
 
 from tabulate import tabulate
 
@@ -159,6 +160,7 @@ class Experiment:
             exp_path = osp.join(getcwd(), name)
 
         self.exp_path = exp_path
+        self.run_ID = "run-" + datetime.datetime.now().strftime("%H:%M:%S") + "-" + datetime.datetime.now().strftime("%Y-%m-%d")
 
         self._launcher = launcher.lower()
 
@@ -344,7 +346,7 @@ class Experiment:
         :param verbose: log parameter settings to std out
         """
         try:
-            generator = Generator(self.exp_path, job)
+            generator = Generator(self.exp_path, self.run_ID, job)
             job_path = generator.generate_experiment()
             return job_path
         except SmartSimError as e:
