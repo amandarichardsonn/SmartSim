@@ -117,7 +117,10 @@ class JsrunArgBuilder(LaunchArgBuilder):
         self._launch_args[key] = value
 
     def finalize(
-        self, exe: ExecutableLike, env: t.Mapping[str, str | None], job_execution_path: str
+        self,
+        exe: ExecutableLike,
+        env: t.Mapping[str, str | None],
+        job_execution_path: str,
     ) -> t.Sequence[str]:
         return (
             "jsrun",
