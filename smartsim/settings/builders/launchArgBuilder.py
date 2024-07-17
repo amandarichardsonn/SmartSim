@@ -55,7 +55,14 @@ class LaunchArgBuilder(ABC):
     @abstractmethod
     def set(self, arg: str, val: str | None) -> None:
         """Set the launch arguments"""
+<<<<<<< HEAD
         pass
+=======
+
+    @abstractmethod
+    def finalize(self, exe: ExecutableLike, env: t.Mapping[str, str | None], job_execution_path: str) -> t.Tuple[t.Sequence[str], str]:
+        """Prepare an entity for launch using the built options"""
+>>>>>>> 724c3bda... mypy changes
 
     def format_launch_args(self) -> t.Union[t.List[str], None]:
         """Build formatted launch arguments"""
