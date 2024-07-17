@@ -28,6 +28,7 @@
 
 from __future__ import annotations
 
+import datetime
 import itertools
 import os
 import os.path as osp
@@ -173,6 +174,12 @@ class Experiment:
             exp_path = osp.join(getcwd(), name)
 
         self.exp_path = exp_path
+        self.run_ID = (
+            "run-"
+            + datetime.datetime.now().strftime("%H:%M:%S")
+            + "-"
+            + datetime.datetime.now().strftime("%Y-%m-%d")
+        )
 
         # TODO: Remove this! The contoller is becoming obsolete
         self._control = Controller(launcher="local")
@@ -203,7 +210,6 @@ class Experiment:
             if launcher is None:
                 launcher = launcher_type.create(self)
                 self._active_launchers.add(launcher)
-            # TODO write comments
             job_execution_path = self._generate(job)
             # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
             # FIXME: Opting out of type check here. Fix this later!!
@@ -214,7 +220,9 @@ class Experiment:
             #        to protocol
             # ---------------------------------------------------------------------
             exe_like = t.cast("ExecutableLike", job.entity)
-            finalized = builder.finalize(exe_like, job.launch_settings.env_vars)
+            finalized = builder.finalize(
+                exe_like, job.launch_settings.env_vars, job_execution_path
+            )
             # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
             return launcher.start(finalized)
 
@@ -331,7 +339,7 @@ class Experiment:
     def _generate(
         self,
         job: Job,
-    ) -> None:
+    ) -> str:
         """Generate the file structure for an ``Experiment``
 
         ``Experiment.generate`` creates directories for each entity
@@ -350,8 +358,9 @@ class Experiment:
         :param verbose: log parameter settings to std out
         """
         try:
-            generator = Generator(self.exp_path, job)
-            generator.generate_experiment()
+            generator = Generator(self.exp_path, self.run_ID, job)
+            job_path = generator.generate_experiment()
+            return job_path
         except SmartSimError as e:
             logger.error(e)
             raise
