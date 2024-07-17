@@ -205,3 +205,50 @@ def test_invalid_hostlist_format(launcher):
         mpiSettings.launch_args.set_hostlist([5])
     with pytest.raises(TypeError):
         mpiSettings.launch_args.set_hostlist(5)
+
+
+@pytest.mark.parametrize(
+    "cls, cmd",
+    (
+        pytest.param(MpiArgBuilder, "mpirun", id="w/ mpirun"),
+        pytest.param(MpiexecArgBuilder, "mpiexec", id="w/ mpiexec"),
+        pytest.param(OrteArgBuilder, "orterun", id="w/ orterun"),
+    ),
+)
+@pytest.mark.parametrize(
+    "args, expected",
+    (
+        pytest.param({}, ("--", "echo", "hello", "world"), id="Empty Args"),
+        pytest.param(
+            {"n": "1"},
+            ("--n", "1", "--", "echo", "hello", "world"),
+            id="Short Arg",
+        ),
+        pytest.param(
+            {"host": "myhost"},
+            ("--host", "myhost", "--", "echo", "hello", "world"),
+            id="Long Arg",
+        ),
+        pytest.param(
+            {"v": None},
+            ("--v", "--", "echo", "hello", "world"),
+            id="Short Arg (No Value)",
+        ),
+        pytest.param(
+            {"verbose": None},
+            ("--verbose", "--", "echo", "hello", "world"),
+            id="Long Arg (No Value)",
+        ),
+        pytest.param(
+            {"n": "1", "host": "myhost"},
+            ("--n", "1", "--host", "myhost", "--", "echo", "hello", "world"),
+            id="Short and Long Args",
+        ),
+    ),
+)
+def test_formatting_launch_args(
+    echo_executable_like, cls, cmd, args, expected, test_dir
+):
+    fmt, path = cls(args).finalize(echo_executable_like, {}, test_dir)
+    assert tuple(fmt) == (cmd,) + expected
+    assert path == test_dir

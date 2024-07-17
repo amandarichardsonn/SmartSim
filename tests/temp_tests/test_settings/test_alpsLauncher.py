@@ -147,3 +147,40 @@ def test_invalid_exclude_hostlist_format():
         alpsLauncher.launch_args.set_excluded_hosts([5])
     with pytest.raises(TypeError):
         alpsLauncher.launch_args.set_excluded_hosts(5)
+
+
+@pytest.mark.parametrize(
+    "args, expected",
+    (
+        pytest.param({}, ("aprun", "--", "echo", "hello", "world"), id="Empty Args"),
+        pytest.param(
+            {"N": "1"},
+            ("aprun", "-N", "1", "--", "echo", "hello", "world"),
+            id="Short Arg",
+        ),
+        pytest.param(
+            {"cpus-per-pe": "1"},
+            ("aprun", "--cpus-per-pe=1", "--", "echo", "hello", "world"),
+            id="Long Arg",
+        ),
+        pytest.param(
+            {"q": None},
+            ("aprun", "-q", "--", "echo", "hello", "world"),
+            id="Short Arg (No Value)",
+        ),
+        pytest.param(
+            {"quiet": None},
+            ("aprun", "--quiet", "--", "echo", "hello", "world"),
+            id="Long Arg (No Value)",
+        ),
+        pytest.param(
+            {"N": "1", "cpus-per-pe": "123"},
+            ("aprun", "-N", "1", "--cpus-per-pe=123", "--", "echo", "hello", "world"),
+            id="Short and Long Args",
+        ),
+    ),
+)
+def test_formatting_launch_args(echo_executable_like, args, expected, test_dir):
+    cmd, path = AprunArgBuilder(args).finalize(echo_executable_like, {}, test_dir)
+    assert tuple(cmd) == expected
+    assert path == test_dir

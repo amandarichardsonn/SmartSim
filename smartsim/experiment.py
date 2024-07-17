@@ -26,6 +26,10 @@
 
 # pylint: disable=too-many-lines
 
+from __future__ import annotations
+
+import datetime
+import itertools
 import os
 import os.path as osp
 import typing as t
@@ -49,7 +53,15 @@ from .entity import (
 from .error import SmartSimError
 from .log import ctx_exp_path, get_logger, method_contextualizer
 from .settings import BatchSettings, Container, RunSettings
-from .wlm import detect_launcher
+
+if t.TYPE_CHECKING:
+    from smartsim.launchable.job import Job
+    from smartsim.settings.builders.launchArgBuilder import (
+        ExecutableLike,
+        LaunchArgBuilder,
+    )
+    from smartsim.settings.dispatch import Dispatcher, LauncherLike
+    from smartsim.types import LaunchedJobID
 
 logger = get_logger(__name__)
 
@@ -159,8 +171,19 @@ class Experiment:
             exp_path = osp.join(getcwd(), name)
 
         self.exp_path = exp_path
+        self.run_ID = (
+            "run-"
+            + datetime.datetime.now().strftime("%H:%M:%S")
+            + "-"
+            + datetime.datetime.now().strftime("%Y-%m-%d")
+        )
 
-        self._launcher = launcher.lower()
+        # TODO: Remove this! The contoller is becoming obsolete
+        self._control = Controller(launcher="local")
+        self._dispatcher = settings_dispatcher
+
+        self._active_launchers: set[LauncherLike[t.Any]] = set()
+        """The active launchers created, used, and reused by the experiment"""
 
         if self._launcher == "auto":
             self._launcher = detect_launcher()
@@ -175,12 +198,33 @@ class Experiment:
         self.fs_identifiers: t.Set[str] = set()
         self._telemetry_cfg = ExperimentTelemetryConfiguration()
 
-    def _set_dragon_server_path(self) -> None:
-        """Set path for dragon server through environment varialbes"""
-        if not "SMARTSIM_DRAGON_SERVER_PATH" in environ:
-            environ["SMARTSIM_DRAGON_SERVER_PATH_EXP"] = osp.join(
-                self.exp_path, CONFIG.dragon_default_subdir
+        def _start(job: Job) -> LaunchedJobID:
+            builder: LaunchArgBuilder[t.Any] = job.launch_settings.launch_args
+            launcher_type = self._dispatcher.get_launcher_for(builder)
+            launcher = first(
+                lambda launcher: type(launcher) is launcher_type,
+                self._active_launchers,
             )
+            if launcher is None:
+                launcher = launcher_type.create(self)
+                self._active_launchers.add(launcher)
+            job_execution_path = self._generate(job)
+            # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+            # FIXME: Opting out of type check here. Fix this later!!
+            # TODO: Very much dislike that we have to pass in attrs off of `job`
+            #       into `builder`, which is itself an attr of an attr of `job`.
+            #       Why is `Job` not generic based on launch arg builder?
+            # FIXME: Remove this dangerous cast after `SmartSimEntity` conforms
+            #        to protocol
+            # ---------------------------------------------------------------------
+            exe_like = t.cast("ExecutableLike", job.entity)
+            finalized = builder.finalize(
+                exe_like, job.launch_settings.env_vars, job_execution_path
+            )
+            # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+            return launcher.start(finalized)
+
+        return tuple(map(_start, jobs))
 
     @_contextualize
     def start(
@@ -290,13 +334,10 @@ class Experiment:
             raise
 
     @_contextualize
-    def generate(
+    def _generate(
         self,
-        *args: t.Union[SmartSimEntity, EntitySequence[SmartSimEntity]],
-        tag: t.Optional[str] = None,
-        overwrite: bool = False,
-        verbose: bool = False,
-    ) -> None:
+        job: Job,
+    ) -> str:
         """Generate the file structure for an ``Experiment``
 
         ``Experiment.generate`` creates directories for each entity
@@ -315,10 +356,9 @@ class Experiment:
         :param verbose: log parameter settings to std out
         """
         try:
-            generator = Generator(self.exp_path, overwrite=overwrite, verbose=verbose)
-            if tag:
-                generator.set_tag(tag)
-            generator.generate_experiment(*args)
+            generator = Generator(self.exp_path, self.run_ID, job)
+            job_path = generator.generate_experiment()
+            return job_path
         except SmartSimError as e:
             logger.error(e)
             raise
