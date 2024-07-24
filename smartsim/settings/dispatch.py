@@ -281,11 +281,17 @@ class ShellLauncher:
         self._launched[id_] = sp.Popen(
             (helpers.expand_exe_path(exe), *rest), cwd=path
         )
+        # args should be a sequence of program arguments or else a single string or path-like object.
         return id_
 
     @classmethod
     def create(cls, _: Experiment) -> Self:
         return cls()
+    
+    # TODO 
+    # Setting current working directory under which command should be executed
+    # Setting the environment under which a command should be executed
+    # Setting file paths to which standard output and standard error streams should be redirected to
 
 
 # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
