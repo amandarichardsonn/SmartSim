@@ -34,9 +34,9 @@ from smartsim.settings.launchSettings import LaunchSettings
 
 pytestmark = pytest.mark.group_a
 # TODO replace with LaunchSettings
-app_1 = Application("app_1", "python", LaunchSettings("slurm"))
-app_2 = Application("app_2", "python", LaunchSettings("slurm"))
-app_3 = Application("app_3", "python", LaunchSettings("slurm"))
+app_1 = Application("app_1", "python")
+app_2 = Application("app_2", "python")
+app_3 = Application("app_3", "python")
 
 
 class MockJob(BaseJob):

@@ -61,7 +61,6 @@ class Application(SmartSimEntity):
         self,
         name: str,
         exe: str,
-        run_settings: "RunSettings",
         params: t.Optional[t.Dict[str, str]] = None,
         exe_args: t.Optional[t.List[str]] = None,
         params_as_args: t.Optional[t.List[str]] = None,
@@ -83,7 +82,7 @@ class Application(SmartSimEntity):
                                application as a batch job
         :param files: Files to have available to the application
         """
-        super().__init__(name, run_settings)
+        super().__init__(name)
         self.exe = [expand_exe_path(exe)]
         # self.exe = [exe] if run_settings.container else [expand_exe_path(exe)]
         self.exe_args = exe_args or []
@@ -129,14 +128,12 @@ class Application(SmartSimEntity):
         return (script for script in self._fs_scripts)
 
     @property
-    def colocated(self) -> bool:
+    def colocated(self) -> None:
         """Return True if this Model will run with a colocated FeatureStore
 
         :return: Return True of the Model will run with a colocated FeatureStore
         """
-        if self.run_settings is None:
-            return False
-        return bool(self.run_settings.colocated_fs_settings)
+        pass
 
     def add_exe_args(self, args: t.Union[str, t.List[str]]) -> None:
         """Add executable arguments to executable

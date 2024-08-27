@@ -98,7 +98,7 @@ class TelemetryConfiguration:
 
 
 class SmartSimEntity:
-    def __init__(self, name: str, run_settings: "RunSettings") -> None:
+    def __init__(self, name: str) -> None:
         """Initialize a SmartSim entity.
 
         Each entity must have a name, path, and
@@ -108,17 +108,11 @@ class SmartSimEntity:
         :param name: Name of the entity
         """
         self.name = name
-        self.run_settings = run_settings
 
     @property
     def type(self) -> str:
         """Return the name of the class"""
         return type(self).__name__
-
-    def set_path(self, path: str) -> None:
-        if not isinstance(path, str):
-            raise TypeError("path argument must be a string")
-        self.path = path
 
     def __repr__(self) -> str:
         return self.name
