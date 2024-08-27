@@ -239,214 +239,214 @@ class Application(SmartSimEntity):
         """Print a table of the attached files on std out"""
         print(self.attached_files_table)
 
-    def colocate_fs(self, *args: t.Any, **kwargs: t.Any) -> None:
-        """An alias for ``Application.colocate_fs_tcp``"""
-        warnings.warn(
-            (
-                "`colocate_fs` has been deprecated and will be removed in a \n"
-                "future release. Please use `colocate_fs_tcp` or `colocate_fs_uds`."
-            ),
-            FutureWarning,
-        )
-        self.colocate_fs_tcp(*args, **kwargs)
+    # def colocate_fs(self, *args: t.Any, **kwargs: t.Any) -> None:
+    #     """An alias for ``Application.colocate_fs_tcp``"""
+    #     warnings.warn(
+    #         (
+    #             "`colocate_fs` has been deprecated and will be removed in a \n"
+    #             "future release. Please use `colocate_fs_tcp` or `colocate_fs_uds`."
+    #         ),
+    #         FutureWarning,
+    #     )
+    #     self.colocate_fs_tcp(*args, **kwargs)
 
-    def colocate_fs_uds(
-        self,
-        unix_socket: str = "/tmp/redis.socket",
-        socket_permissions: int = 755,
-        fs_cpus: int = 1,
-        custom_pinning: t.Optional[t.Iterable[t.Union[int, t.Iterable[int]]]] = None,
-        debug: bool = False,
-        fs_identifier: str = "",
-        **kwargs: t.Any,
-    ) -> None:
-        """Colocate an FeatureStore instance with this Application over UDS.
+    # def colocate_fs_uds(
+    #     self,
+    #     unix_socket: str = "/tmp/redis.socket",
+    #     socket_permissions: int = 755,
+    #     fs_cpus: int = 1,
+    #     custom_pinning: t.Optional[t.Iterable[t.Union[int, t.Iterable[int]]]] = None,
+    #     debug: bool = False,
+    #     fs_identifier: str = "",
+    #     **kwargs: t.Any,
+    # ) -> None:
+    #     """Colocate an FeatureStore instance with this Application over UDS.
 
-        This method will initialize settings which add an unsharded feature
-        store to this Application instance. Only this Application will be able
-        to communicate with this colocated feature store by using Unix Domain
-        sockets.
+    #     This method will initialize settings which add an unsharded feature
+    #     store to this Application instance. Only this Application will be able
+    #     to communicate with this colocated feature store by using Unix Domain
+    #     sockets.
 
-        Extra parameters for the fs can be passed through kwargs. This includes
-        many performance, caching and inference settings.
+    #     Extra parameters for the fs can be passed through kwargs. This includes
+    #     many performance, caching and inference settings.
 
-        .. highlight:: python
-        .. code-block:: python
+    #     .. highlight:: python
+    #     .. code-block:: python
 
-            example_kwargs = {
-                "maxclients": 100000,
-                "threads_per_queue": 1,
-                "inter_op_threads": 1,
-                "intra_op_threads": 1,
-                "server_threads": 2 # keydb only
-            }
+    #         example_kwargs = {
+    #             "maxclients": 100000,
+    #             "threads_per_queue": 1,
+    #             "inter_op_threads": 1,
+    #             "intra_op_threads": 1,
+    #             "server_threads": 2 # keydb only
+    #         }
 
-        Generally these don't need to be changed.
+    #     Generally these don't need to be changed.
 
-        :param unix_socket: path to where the socket file will be created
-        :param socket_permissions: permissions for the socketfile
-        :param fs_cpus: number of cpus to use for FeatureStore
-        :param custom_pinning: CPUs to pin the FeatureStore to. Passing an empty
-                               iterable disables pinning
-        :param debug: launch Application with extra debug information about the
-                      colocated fs
-        :param kwargs: additional keyword arguments to pass to the FeatureStore
-                       feature store
-        """
+    #     :param unix_socket: path to where the socket file will be created
+    #     :param socket_permissions: permissions for the socketfile
+    #     :param fs_cpus: number of cpus to use for FeatureStore
+    #     :param custom_pinning: CPUs to pin the FeatureStore to. Passing an empty
+    #                            iterable disables pinning
+    #     :param debug: launch Application with extra debug information about the
+    #                   colocated fs
+    #     :param kwargs: additional keyword arguments to pass to the FeatureStore
+    #                    feature store
+    #     """
 
-        if not re.match(r"^[a-zA-Z0-9.:\,_\-/]*$", unix_socket):
-            raise ValueError(
-                f"Invalid name for unix socket: {unix_socket}. Must only "
-                "contain alphanumeric characters or . : _ - /"
-            )
-        uds_options: t.Dict[str, t.Union[int, str]] = {
-            "unix_socket": unix_socket,
-            "socket_permissions": socket_permissions,
-            # This is hardcoded to 0 as recommended by redis for UDS
-            "port": 0,
-        }
+    #     if not re.match(r"^[a-zA-Z0-9.:\,_\-/]*$", unix_socket):
+    #         raise ValueError(
+    #             f"Invalid name for unix socket: {unix_socket}. Must only "
+    #             "contain alphanumeric characters or . : _ - /"
+    #         )
+    #     uds_options: t.Dict[str, t.Union[int, str]] = {
+    #         "unix_socket": unix_socket,
+    #         "socket_permissions": socket_permissions,
+    #         # This is hardcoded to 0 as recommended by redis for UDS
+    #         "port": 0,
+    #     }
 
-        common_options = {
-            "cpus": fs_cpus,
-            "custom_pinning": custom_pinning,
-            "debug": debug,
-            "fs_identifier": fs_identifier,
-        }
-        self._set_colocated_fs_settings(uds_options, common_options, **kwargs)
+    #     common_options = {
+    #         "cpus": fs_cpus,
+    #         "custom_pinning": custom_pinning,
+    #         "debug": debug,
+    #         "fs_identifier": fs_identifier,
+    #     }
+    #     self._set_colocated_fs_settings(uds_options, common_options, **kwargs)
 
-    def colocate_fs_tcp(
-        self,
-        port: int = 6379,
-        ifname: t.Union[str, list[str]] = "lo",
-        fs_cpus: int = 1,
-        custom_pinning: t.Optional[t.Iterable[t.Union[int, t.Iterable[int]]]] = None,
-        debug: bool = False,
-        fs_identifier: str = "",
-        **kwargs: t.Any,
-    ) -> None:
-        """Colocate an FeatureStore instance with this Application over TCP/IP.
+    # def colocate_fs_tcp(
+    #     self,
+    #     port: int = 6379,
+    #     ifname: t.Union[str, list[str]] = "lo",
+    #     fs_cpus: int = 1,
+    #     custom_pinning: t.Optional[t.Iterable[t.Union[int, t.Iterable[int]]]] = None,
+    #     debug: bool = False,
+    #     fs_identifier: str = "",
+    #     **kwargs: t.Any,
+    # ) -> None:
+    #     """Colocate an FeatureStore instance with this Application over TCP/IP.
 
-        This method will initialize settings which add an unsharded feature
-        store to this Application instance. Only this Application will be able
-        to communicate with this colocated feature store by using the loopback
-        TCP interface.
+    #     This method will initialize settings which add an unsharded feature
+    #     store to this Application instance. Only this Application will be able
+    #     to communicate with this colocated feature store by using the loopback
+    #     TCP interface.
 
-        Extra parameters for the fs can be passed through kwargs. This includes
-        many performance, caching and inference settings.
+    #     Extra parameters for the fs can be passed through kwargs. This includes
+    #     many performance, caching and inference settings.
 
-        .. highlight:: python
-        .. code-block:: python
+    #     .. highlight:: python
+    #     .. code-block:: python
 
-            ex. kwargs = {
-                maxclients: 100000,
-                threads_per_queue: 1,
-                inter_op_threads: 1,
-                intra_op_threads: 1,
-                server_threads: 2 # keydb only
-            }
+    #         ex. kwargs = {
+    #             maxclients: 100000,
+    #             threads_per_queue: 1,
+    #             inter_op_threads: 1,
+    #             intra_op_threads: 1,
+    #             server_threads: 2 # keydb only
+    #         }
 
-        Generally these don't need to be changed.
+    #     Generally these don't need to be changed.
 
-        :param port: port to use for FeatureStore feature store
-        :param ifname: interface to use for FeatureStore
-        :param fs_cpus: number of cpus to use for FeatureStore
-        :param custom_pinning: CPUs to pin the FeatureStore to. Passing an empty
-                               iterable disables pinning
-        :param debug: launch Application with extra debug information about the
-                      colocated fs
-        :param kwargs: additional keyword arguments to pass to the FeatureStore
-                       feature store
-        """
+    #     :param port: port to use for FeatureStore feature store
+    #     :param ifname: interface to use for FeatureStore
+    #     :param fs_cpus: number of cpus to use for FeatureStore
+    #     :param custom_pinning: CPUs to pin the FeatureStore to. Passing an empty
+    #                            iterable disables pinning
+    #     :param debug: launch Application with extra debug information about the
+    #                   colocated fs
+    #     :param kwargs: additional keyword arguments to pass to the FeatureStore
+    #                    feature store
+    #     """
 
-        tcp_options = {"port": port, "ifname": ifname}
-        common_options = {
-            "cpus": fs_cpus,
-            "custom_pinning": custom_pinning,
-            "debug": debug,
-            "fs_identifier": fs_identifier,
-        }
-        self._set_colocated_fs_settings(tcp_options, common_options, **kwargs)
+    #     tcp_options = {"port": port, "ifname": ifname}
+    #     common_options = {
+    #         "cpus": fs_cpus,
+    #         "custom_pinning": custom_pinning,
+    #         "debug": debug,
+    #         "fs_identifier": fs_identifier,
+    #     }
+    #     self._set_colocated_fs_settings(tcp_options, common_options, **kwargs)
 
-    def _set_colocated_fs_settings(
-        self,
-        connection_options: t.Mapping[str, t.Union[int, t.List[str], str]],
-        common_options: t.Dict[
-            str,
-            t.Union[
-                t.Union[t.Iterable[t.Union[int, t.Iterable[int]]], None],
-                bool,
-                int,
-                str,
-                None,
-            ],
-        ],
-        **kwargs: t.Union[int, None],
-    ) -> None:
-        """
-        Ingest the connection-specific options (UDS/TCP) and set the final settings
-        for the colocated feature store
-        """
+    # def _set_colocated_fs_settings(
+    #     self,
+    #     connection_options: t.Mapping[str, t.Union[int, t.List[str], str]],
+    #     common_options: t.Dict[
+    #         str,
+    #         t.Union[
+    #             t.Union[t.Iterable[t.Union[int, t.Iterable[int]]], None],
+    #             bool,
+    #             int,
+    #             str,
+    #             None,
+    #         ],
+    #     ],
+    #     **kwargs: t.Union[int, None],
+    # ) -> None:
+    #     """
+    #     Ingest the connection-specific options (UDS/TCP) and set the final settings
+    #     for the colocated feature store
+    #     """
 
-        if hasattr(self.run_settings, "mpmd") and len(self.run_settings.mpmd) > 0:
-            raise SSUnsupportedError(
-                "Applications colocated with feature stores cannot be run as a "
-                "mpmd workload"
-            )
+    #     if hasattr(self.run_settings, "mpmd") and len(self.run_settings.mpmd) > 0:
+    #         raise SSUnsupportedError(
+    #             "Applications colocated with feature stores cannot be run as a "
+    #             "mpmd workload"
+    #         )
 
-        if hasattr(self.run_settings, "_prep_colocated_fs"):
-            # pylint: disable-next=protected-access
-            self.run_settings._prep_colocated_fs(common_options["cpus"])
+    #     if hasattr(self.run_settings, "_prep_colocated_fs"):
+    #         # pylint: disable-next=protected-access
+    #         self.run_settings._prep_colocated_fs(common_options["cpus"])
 
-        if "limit_app_cpus" in kwargs:
-            raise SSUnsupportedError(
-                "Pinning app CPUs via limit_app_cpus is not supported. Modify "
-                "RunSettings using the correct binding option for your launcher."
-            )
+    #     if "limit_app_cpus" in kwargs:
+    #         raise SSUnsupportedError(
+    #             "Pinning app CPUs via limit_app_cpus is not supported. Modify "
+    #             "RunSettings using the correct binding option for your launcher."
+    #         )
 
-        # TODO list which fs settings can be extras
-        custom_pinning_ = t.cast(
-            t.Optional[t.Iterable[t.Union[int, t.Iterable[int]]]],
-            common_options.get("custom_pinning"),
-        )
-        cpus_ = t.cast(int, common_options.get("cpus"))
-        common_options["custom_pinning"] = self._create_pinning_string(
-            custom_pinning_, cpus_
-        )
+    #     # TODO list which fs settings can be extras
+    #     custom_pinning_ = t.cast(
+    #         t.Optional[t.Iterable[t.Union[int, t.Iterable[int]]]],
+    #         common_options.get("custom_pinning"),
+    #     )
+    #     cpus_ = t.cast(int, common_options.get("cpus"))
+    #     common_options["custom_pinning"] = self._create_pinning_string(
+    #         custom_pinning_, cpus_
+    #     )
 
-        colo_fs_config: t.Dict[
-            str,
-            t.Union[
-                bool,
-                int,
-                str,
-                None,
-                t.List[str],
-                t.Iterable[t.Union[int, t.Iterable[int]]],
-                t.List[FSModel],
-                t.List[FSScript],
-                t.Dict[str, t.Union[int, None]],
-                t.Dict[str, str],
-            ],
-        ] = {}
-        colo_fs_config.update(connection_options)
-        colo_fs_config.update(common_options)
+    #     colo_fs_config: t.Dict[
+    #         str,
+    #         t.Union[
+    #             bool,
+    #             int,
+    #             str,
+    #             None,
+    #             t.List[str],
+    #             t.Iterable[t.Union[int, t.Iterable[int]]],
+    #             t.List[FSModel],
+    #             t.List[FSScript],
+    #             t.Dict[str, t.Union[int, None]],
+    #             t.Dict[str, str],
+    #         ],
+    #     ] = {}
+    #     colo_fs_config.update(connection_options)
+    #     colo_fs_config.update(common_options)
 
-        redis_ai_temp = {
-            "threads_per_queue": kwargs.get("threads_per_queue", None),
-            "inter_op_parallelism": kwargs.get("inter_op_parallelism", None),
-            "intra_op_parallelism": kwargs.get("intra_op_parallelism", None),
-        }
-        # redisai arguments for inference settings
-        colo_fs_config["rai_args"] = redis_ai_temp
-        colo_fs_config["extra_fs_args"] = {
-            k: str(v) for k, v in kwargs.items() if k not in redis_ai_temp
-        }
+    #     redis_ai_temp = {
+    #         "threads_per_queue": kwargs.get("threads_per_queue", None),
+    #         "inter_op_parallelism": kwargs.get("inter_op_parallelism", None),
+    #         "intra_op_parallelism": kwargs.get("intra_op_parallelism", None),
+    #     }
+    #     # redisai arguments for inference settings
+    #     colo_fs_config["rai_args"] = redis_ai_temp
+    #     colo_fs_config["extra_fs_args"] = {
+    #         k: str(v) for k, v in kwargs.items() if k not in redis_ai_temp
+    #     }
 
-        self._check_fs_objects_colo()
-        colo_fs_config["fs_models"] = self._fs_models
-        colo_fs_config["fs_scripts"] = self._fs_scripts
+    #     self._check_fs_objects_colo()
+    #     colo_fs_config["fs_models"] = self._fs_models
+    #     colo_fs_config["fs_scripts"] = self._fs_scripts
 
-        self.run_settings.colocated_fs_settings = colo_fs_config
+    #     self.run_settings.colocated_fs_settings = colo_fs_config
 
     @staticmethod
     def _create_pinning_string(

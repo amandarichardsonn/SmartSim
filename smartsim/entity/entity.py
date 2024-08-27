@@ -113,6 +113,8 @@ class SmartSimEntity:
     def type(self) -> str:
         """Return the name of the class"""
         return type(self).__name__
+    
+    def as_program_arguments() -> t.Sequence[str]: ...
 
     def __repr__(self) -> str:
         return self.name
