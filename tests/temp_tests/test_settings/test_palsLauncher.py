@@ -24,8 +24,13 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import io
+import os
+import pathlib
+
 import pytest
 
+from smartsim._core.shell.shellLauncher import ShellLauncherCommand
 from smartsim.settings import LaunchSettings
 from smartsim.settings.arguments.launch.pals import (
     PalsMpiexecLaunchArguments,
@@ -78,13 +83,13 @@ def test_pals_class_methods(function, value, flag, result):
     assert isinstance(palsLauncher.launch_args, PalsMpiexecLaunchArguments)
     getattr(palsLauncher.launch_args, function)(*value)
     assert palsLauncher.launch_args._launch_args[flag] == result
-    assert palsLauncher.format_launch_args() == ["--" + flag, str(result)]
+    assert palsLauncher._arguments.format_launch_args() == ["--" + flag, str(result)]
 
 
 def test_format_env_vars():
     env_vars = {"FOO_VERSION": "3.14", "PATH": None, "LD_LIBRARY_PATH": None}
     palsLauncher = LaunchSettings(launcher=LauncherType.Pals, env_vars=env_vars)
-    formatted = " ".join(palsLauncher.format_env_vars())
+    formatted = " ".join(palsLauncher._arguments.format_env_vars(env_vars))
     expected = "--env FOO_VERSION=3.14 --envlist PATH,LD_LIBRARY_PATH"
     assert formatted == expected
 
@@ -132,8 +137,22 @@ def test_invalid_hostlist_format():
     ),
 )
 def test_formatting_launch_args(mock_echo_executable, args, expected, test_dir):
-    path, cmd = _as_pals_command(
-        PalsMpiexecLaunchArguments(args), mock_echo_executable, test_dir, {}
+    out = os.path.join(test_dir, "out.txt")
+    err = os.path.join(test_dir, "err.txt")
+    open(out, "w"), open(err, "w")
+    shell_launch_cmd = _as_pals_command(
+        PalsMpiexecLaunchArguments(args),
+        mock_echo_executable,
+        test_dir,
+        {},
+        out,
+        err,
     )
-    assert tuple(cmd) == expected
-    assert path == test_dir
+    assert isinstance(shell_launch_cmd, ShellLauncherCommand)
+    assert shell_launch_cmd.command_tuple == expected
+    assert shell_launch_cmd.path == pathlib.Path(test_dir)
+    assert shell_launch_cmd.env == {}
+    assert isinstance(shell_launch_cmd.stdout, io.TextIOWrapper)
+    assert shell_launch_cmd.stdout.name == out
+    assert isinstance(shell_launch_cmd.stderr, io.TextIOWrapper)
+    assert shell_launch_cmd.stderr.name == err

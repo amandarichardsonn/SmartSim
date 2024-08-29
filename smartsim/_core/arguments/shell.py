@@ -24,29 +24,19 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import pytest
+from __future__ import annotations
 
-from smartsim._core.commands.command import Command
-from smartsim._core.commands.commandList import CommandList
-from smartsim._core.commands.launchCommands import LaunchCommands
-from smartsim.settings.launchCommand import LauncherType
+import typing as t
+from abc import abstractmethod
 
-pytestmark = pytest.mark.group_a
+from smartsim.log import get_logger
+from smartsim.settings.arguments.launchArguments import LaunchArguments
 
-pre_cmd = Command(command=["pre", "cmd"])
-launch_cmd = Command(command=["launch", "cmd"])
-post_cmd = Command(command=["post", "cmd"])
-pre_commands_list = CommandList(commands=[pre_cmd])
-launch_command_list = CommandList(commands=[launch_cmd])
-post_command_list = CommandList(commands=[post_cmd])
+logger = get_logger(__name__)
 
 
-def test_launchCommand_init():
-    launch_cmd = LaunchCommands(
-        prelaunch_commands=pre_commands_list,
-        launch_commands=launch_command_list,
-        postlaunch_commands=post_command_list,
-    )
-    assert launch_cmd.prelaunch_command == pre_commands_list
-    assert launch_cmd.launch_command == launch_command_list
-    assert launch_cmd.postlaunch_command == post_command_list
+class ShellLaunchArguments(LaunchArguments):
+    @abstractmethod
+    def format_env_vars(self, env_vars: t.Mapping[str, str | None]) -> list[str]: ...
+    @abstractmethod
+    def format_launch_args(self) -> list[str]: ...

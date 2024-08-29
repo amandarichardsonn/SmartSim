@@ -26,22 +26,45 @@
 
 from __future__ import annotations
 
+import pathlib
+import subprocess
 import typing as t
 
-from smartsim._core.dispatch import dispatch
-from smartsim._core.shell.shellLauncher import ShellLauncher, make_shell_format_fn
+from smartsim._core.arguments.shell import ShellLaunchArguments
+from smartsim._core.dispatch import EnvironMappingType, dispatch
+from smartsim._core.shell.shellLauncher import ShellLauncher, ShellLauncherCommand
+from smartsim._core.utils.launcher import ExecutableProtocol
 from smartsim.log import get_logger
 
 from ...common import set_check_input
 from ...launchCommand import LauncherType
-from ..launchArguments import LaunchArguments
 
 logger = get_logger(__name__)
-_as_jsrun_command = make_shell_format_fn(run_command="jsrun")
+
+
+def _as_jsrun_command(
+    args: ShellLaunchArguments,
+    exe: ExecutableProtocol,
+    path: pathlib.Path,
+    env: EnvironMappingType,
+    stdout_path: pathlib.Path,
+    stderr_path: pathlib.Path,
+) -> ShellLauncherCommand:
+    command_tuple = (
+        "jsrun",
+        *(args.format_launch_args() or ()),
+        f"--stdio_stdout={stdout_path}",
+        f"--stdio_stderr={stderr_path}",
+        "--",
+        *exe.as_program_arguments(),
+    )
+    return ShellLauncherCommand(
+        env, path, subprocess.DEVNULL, subprocess.DEVNULL, command_tuple
+    )
 
 
 @dispatch(with_format=_as_jsrun_command, to_launcher=ShellLauncher)
-class JsrunLaunchArguments(LaunchArguments):
+class JsrunLaunchArguments(ShellLaunchArguments):
     def launcher_str(self) -> str:
         """Get the string representation of the launcher
 
@@ -74,9 +97,7 @@ class JsrunLaunchArguments(LaunchArguments):
         """
         self.set("bind", binding)
 
-    def format_env_vars(
-        self, env_vars: t.Dict[str, t.Optional[str]]
-    ) -> t.Union[t.List[str], None]:
+    def format_env_vars(self, env_vars: t.Mapping[str, str | None]) -> list[str]:
         """Format environment variables. Each variable needs
         to be passed with ``--env``. If a variable is set to ``None``,
         its value is propagated from the current environment.
@@ -91,7 +112,7 @@ class JsrunLaunchArguments(LaunchArguments):
                 format_str += ["-E", f"{k}"]
         return format_str
 
-    def format_launch_args(self) -> t.Union[t.List[str], None]:
+    def format_launch_args(self) -> t.List[str]:
         """Return a list of LSF formatted run arguments
 
         :return: list of LSF arguments for these settings

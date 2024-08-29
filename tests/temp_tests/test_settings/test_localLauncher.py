@@ -23,8 +23,13 @@
 # CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+import io
+import os
+import pathlib
+
 import pytest
 
+from smartsim._core.shell.shellLauncher import ShellLauncherCommand
 from smartsim.settings import LaunchSettings
 from smartsim.settings.arguments.launch.local import (
     LocalLaunchArguments,
@@ -88,7 +93,7 @@ def test_update_env(env_vars):
 
 def test_format_launch_args():
     localLauncher = LaunchSettings(launcher=LauncherType.Local, launch_args={"-np": 2})
-    launch_args = localLauncher.format_launch_args()
+    launch_args = localLauncher._arguments.format_launch_args()
     assert launch_args == ["-np", "2"]
 
 
@@ -139,12 +144,26 @@ def test_format_env_vars():
     }
     localLauncher = LaunchSettings(launcher=LauncherType.Local, env_vars=env_vars)
     assert isinstance(localLauncher._arguments, LocalLaunchArguments)
-    assert localLauncher.format_env_vars() == ["A=a", "B=", "C=", "D=12"]
+    assert localLauncher._arguments.format_env_vars(env_vars) == [
+        "A=a",
+        "B=",
+        "C=",
+        "D=12",
+    ]
 
 
 def test_formatting_returns_original_exe(mock_echo_executable, test_dir):
-    path, cmd = _as_local_command(
-        LocalLaunchArguments({}), mock_echo_executable, test_dir, {}
+    out = os.path.join(test_dir, "out.txt")
+    err = os.path.join(test_dir, "err.txt")
+    open(out, "w"), open(err, "w")
+    shell_launch_cmd = _as_local_command(
+        LocalLaunchArguments({}), mock_echo_executable, test_dir, {}, out, err
     )
-    assert tuple(cmd) == ("echo", "hello", "world")
-    assert path == test_dir
+    assert isinstance(shell_launch_cmd, ShellLauncherCommand)
+    assert shell_launch_cmd.command_tuple == ("echo", "hello", "world")
+    assert shell_launch_cmd.path == pathlib.Path(test_dir)
+    assert shell_launch_cmd.env == {}
+    assert isinstance(shell_launch_cmd.stdout, io.TextIOWrapper)
+    assert shell_launch_cmd.stdout.name == out
+    assert isinstance(shell_launch_cmd.stderr, io.TextIOWrapper)
+    assert shell_launch_cmd.stderr.name == err

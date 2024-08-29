@@ -24,10 +24,14 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import io
 import itertools
+import os
+import pathlib
 
 import pytest
 
+from smartsim._core.shell.shellLauncher import ShellLauncherCommand
 from smartsim.settings import LaunchSettings
 from smartsim.settings.arguments.launch.mpi import (
     MpiexecLaunchArguments,
@@ -159,7 +163,7 @@ def test_mpi_class_methods(l, function, value, flag, result):
 def test_format_env_vars(launcher):
     env_vars = {"OMP_NUM_THREADS": "20", "LOGGING": "verbose"}
     mpiSettings = LaunchSettings(launcher=launcher, env_vars=env_vars)
-    formatted = mpiSettings.format_env_vars()
+    formatted = mpiSettings._arguments.format_env_vars(env_vars)
     result = [
         "-x",
         "OMP_NUM_THREADS=20",
@@ -182,7 +186,7 @@ def test_format_launcher_args(launcher):
     mpiSettings.launch_args.set_cpus_per_task(1)
     mpiSettings.launch_args.set_tasks(2)
     mpiSettings.launch_args.set_hostlist(["node005", "node006"])
-    formatted = mpiSettings.format_launch_args()
+    formatted = mpiSettings._arguments.format_launch_args()
     result = ["--cpus-per-proc", "1", "--n", "2", "--host", "node005,node006"]
     assert formatted == result
 
@@ -286,6 +290,15 @@ def test_invalid_hostlist_format(launcher):
 def test_formatting_launch_args(
     mock_echo_executable, cls, fmt, cmd, args, expected, test_dir
 ):
-    path, fmt_cmd = fmt(cls(args), mock_echo_executable, test_dir, {})
-    assert tuple(fmt_cmd) == (cmd,) + expected
-    assert path == test_dir
+    out = os.path.join(test_dir, "out.txt")
+    err = os.path.join(test_dir, "err.txt")
+    open(out, "w"), open(err, "w")
+    shell_launch_cmd = fmt(cls(args), mock_echo_executable, test_dir, {}, out, err)
+    assert isinstance(shell_launch_cmd, ShellLauncherCommand)
+    assert shell_launch_cmd.command_tuple == (cmd,) + expected
+    assert shell_launch_cmd.path == pathlib.Path(test_dir)
+    assert shell_launch_cmd.env == {}
+    assert isinstance(shell_launch_cmd.stdout, io.TextIOWrapper)
+    assert shell_launch_cmd.stdout.name == out
+    assert isinstance(shell_launch_cmd.stderr, io.TextIOWrapper)
+    assert shell_launch_cmd.stderr.name == err
